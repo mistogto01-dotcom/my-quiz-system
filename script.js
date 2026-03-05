@@ -913,25 +913,43 @@ const quizData = [// --- 職業道德 (001-100) 完全對應 PDF 版 ---
 
 ];
 
+// --- 邏輯處理區 (含隨機洗牌功能) ---
+
 let currentQuestionIndex = 0;
 let wrongQuestions = JSON.parse(localStorage.getItem('wrongQuestions')) || [];
+
+// 隨機洗牌函數 (Fisher-Yates Shuffle)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
 
 function loadQuestion() {
     const questionElement = document.getElementById("question-text");
     const optionsContainer = document.getElementById("options-container");
+    const resultMsg = document.getElementById("result-message");
+    
+    if (!questionElement || !optionsContainer) return;
+
     const currentQ = quizData[currentQuestionIndex];
 
     if (!currentQ) {
-        questionElement.innerText = "測驗結束！";
+        questionElement.innerText = "🎉 所有題目測驗結束！";
+        optionsContainer.innerHTML = "";
         return;
     }
 
-    questionElement.innerText = `${currentQuestionIndex + 1}. ${currentQ.q}`;
+    // 顯示進度與題目
+    questionElement.innerText = `[${currentQuestionIndex + 1} / ${quizData.length}] ${currentQ.q}`;
     optionsContainer.innerHTML = "";
+    resultMsg.innerText = "";
 
     currentQ.a.forEach((option, index) => {
         const btn = document.createElement("button");
         btn.innerText = option;
+        btn.className = "option-btn"; // 確保你有在 CSS 設定樣式
         btn.onclick = () => checkAnswer(index);
         optionsContainer.appendChild(btn);
     });
@@ -942,18 +960,17 @@ function checkAnswer(selectedIndex) {
     const resultMsg = document.getElementById("result-message");
 
     if (selectedIndex === currentQ.ans) {
-        resultMsg.innerText = "正確！";
+        resultMsg.innerText = "✅ 正確！";
         resultMsg.style.color = "green";
         currentQuestionIndex++;
-        setTimeout(() => {
-            resultMsg.innerText = "";
-            loadQuestion();
-        }, 1000);
+        // 延遲自動下一題，讓你瞄一下進度
+        setTimeout(loadQuestion, 800);
     } else {
-        resultMsg.innerText = "錯誤！正確答案是 " + currentQ.a[currentQ.ans];
+        resultMsg.innerText = "❌ 錯誤！答案是：" + currentQ.a[currentQ.ans];
         resultMsg.style.color = "red";
-        // 紀錄錯誤
-        if (!wrongQuestions.find(item => item.q === currentQ.q)) {
+        
+        // 紀錄錯誤題目 (重複不列入)
+        if (!wrongQuestions.some(item => item.q === currentQ.q)) {
             wrongQuestions.push(currentQ);
             localStorage.setItem('wrongQuestions', JSON.stringify(wrongQuestions));
             displayWrong();
@@ -963,22 +980,28 @@ function checkAnswer(selectedIndex) {
 
 function displayWrong() {
     const wrongList = document.getElementById("wrong-list");
-    wrongList.innerHTML = wrongQuestions.map(q => `<p>${q.q} (答案：${q.a[q.ans]})</p>`).join("");
+    if (!wrongList) return;
+    
+    // 顯示錯誤列表，附帶正確答案
+    wrongList.innerHTML = wrongQuestions.map((q, idx) => 
+        `<div class="wrong-item" style="border-bottom:1px solid #ddd; padding:10px;">
+            ${idx + 1}. ${q.q} <br> 
+            <b style="color:blue;">正確答案：${q.a[q.ans]}</b>
+        </div>`
+    ).join("");
 }
 
 function clearWrong() {
-    wrongQuestions = [];
-    localStorage.removeItem('wrongQuestions');
-    displayWrong();
+    if (confirm("確定要清空所有錯誤記錄嗎？")) {
+        wrongQuestions = [];
+        localStorage.removeItem('wrongQuestions');
+        displayWrong();
+    }
 }
 
-// 頁面載入後啟動
+// 頁面載入後：先隨機洗牌，再顯示第一題
 window.onload = () => {
+    shuffleArray(quizData); // <--- 關鍵！啟動時隨機排序
     loadQuestion();
     displayWrong();
 };
-
-
-
-
-
