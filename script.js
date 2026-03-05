@@ -1,9 +1,5 @@
-// 核心邏輯：隨機出題與錯誤分類
-let currentIdx = 0;
-let wrongQuestions = JSON.parse(localStorage.getItem('wrongList')) || [];
-let shuffledQuestions = [];
-
-const allQuestions = [// --- 職業道德 (001-100) 完全對應 PDF 版 ---
+// 直接將題庫放入變數，不要用 fetch 讀取 data.json，避免手機路徑問題
+const quizData = [// --- 職業道德 (001-100) 完全對應 PDF 版 ---
     { q: "金融從業人員從事保險招攬行為,下列那一項是錯的?", a: ["(1)解釋保險商品內容及保單條款", "(2)說明填寫要保書注意事項、轉送要保文件及保險單", "(3)經所屬公司授權從事保險招攬行為", "(4)可以向未經授權公司從事保險招攬行為"], ans: 3 },
     { q: "金融從業人員從事保險招攬所用文書、圖畫、廣告文宣,下列那一項是錯的?", a: ["(1)應標明所屬公司之名稱", "(2)所屬公司為代理人、經紀人者並應標明往來保險業名稱", "(3)保險代理人、經紀人所屬業務員所使用之文書、圖書、廣告文宣,應經往來保險業同意方可使用", "(4)廣告文宣之內容可任意將保險業報經主管機關審查通過之保單條款、費率及要保書文件予以更改"], ans: 3 },
     { q: "金融從業人員於保險業務員登錄後,應專為下列何者從事保險招攬?", a: ["(1)自己", "(2)要保人", "(3)所屬公司", "(4)保險人"], ans: 2 },
@@ -919,120 +915,70 @@ const allQuestions = [// --- 職業道德 (001-100) 完全對應 PDF 版 ---
     { q: "下列何者為衡量國家債務負擔能力的常用指標？", a: ["(1)國債/GDP 比率", "(2)國人存款總額", "(3)銀行數量", "(4)股市交易量"], ans: 0 },
     { q: "金融市場常識測驗總題數為：", a: ["(1)100題", "(2)504題", "(3)1000題", "(4)不固定"], ans: 1 },
     { q: "我國期貨交易之保證金制度採用：", a: ["(1)總額保證金法", "(2)淨額保證金法", "(3)混合法", "(4)當事人自由選擇"], ans: 0 }
-    ];
 
-// =====================================================================
-// ==================== 核心執行邏輯 (請務必保留) ======================
-// =====================================================================
+];
 
-// 隨機排序函數
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
+let currentQuestionIndex = 0;
+let wrongQuestions = JSON.parse(localStorage.getItem('wrongQuestions')) || [];
 
-// 測驗初始化
-function initQuiz() {
-    shuffledQuestions = shuffle([...allQuestions]);
-    currentIdx = 0;
-    loadQuestion();
-}
-
-// 載入題目
 function loadQuestion() {
-    const quizBox = document.getElementById('quiz-box');
-    
-    // 如果題目已經做完
-    if (currentIdx >= shuffledQuestions.length) {
-        quizBox.innerHTML = `
-            <h2>🎉 恭喜！您已完成所有題目練習！</h2>
-            <p>本次題庫涵蓋：金融市場常識與職業道德 1120 題精華版</p>
-            <button onclick='location.reload()' style='padding:10px 20px; font-size:16px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer;'>重新挑戰</button>
-        `;
+    const questionElement = document.getElementById("question-text");
+    const optionsContainer = document.getElementById("options-container");
+    const currentQ = quizData[currentQuestionIndex];
+
+    if (!currentQ) {
+        questionElement.innerText = "測驗結束！";
         return;
     }
 
-    const q = shuffledQuestions[currentIdx];
-    document.getElementById('question-text').innerText = `第 ${currentIdx + 1} 題：${q.q}`;
-    
-    const container = document.getElementById('options-container');
-    container.innerHTML = '';
-    document.getElementById('result-message').innerText = '';
+    questionElement.innerText = `${currentQuestionIndex + 1}. ${currentQ.q}`;
+    optionsContainer.innerHTML = "";
 
-    q.a.forEach((opt, i) => {
-        const btn = document.createElement('button');
-        btn.innerText = opt;
-        // 點擊選項時檢查答案
-        btn.onclick = () => checkAnswer(i);
-        container.appendChild(btn);
+    currentQ.a.forEach((option, index) => {
+        const btn = document.createElement("button");
+        btn.innerText = option;
+        btn.onclick = () => checkAnswer(index);
+        optionsContainer.appendChild(btn);
     });
-    
-    renderWrongList();
 }
 
-// 檢查答案
-function checkAnswer(selected) {
-    const q = shuffledQuestions[currentIdx];
-    const btns = document.querySelectorAll('#options-container button');
-    
-    if (selected === q.ans) {
-        // 答對處理
-        document.getElementById('result-message').innerHTML = "<span style='color:green; font-weight:bold;'>✅ 答對了！</span>";
-        btns[selected].classList.add('correct');
-        
-        // 延遲 0.8 秒後自動進入下一題
+function checkAnswer(selectedIndex) {
+    const currentQ = quizData[currentQuestionIndex];
+    const resultMsg = document.getElementById("result-message");
+
+    if (selectedIndex === currentQ.ans) {
+        resultMsg.innerText = "正確！";
+        resultMsg.style.color = "green";
+        currentQuestionIndex++;
         setTimeout(() => {
-            currentIdx++;
+            resultMsg.innerText = "";
             loadQuestion();
-        }, 800);
+        }, 1000);
     } else {
-        // 答錯處理
-        document.getElementById('result-message').innerHTML = `<span style='color:red; font-weight:bold;'>❌ 答錯了！正確答案是：${q.a[q.ans]}</span>`;
-        btns[selected].classList.add('wrong');
-        
-        // 將錯題存入 localStorage 錯誤清單
-        if (!wrongQuestions.some(item => item.q === q.q)) {
-            wrongQuestions.push(q);
-            localStorage.setItem('wrongList', JSON.stringify(wrongQuestions));
-            renderWrongList();
+        resultMsg.innerText = "錯誤！正確答案是 " + currentQ.a[currentQ.ans];
+        resultMsg.style.color = "red";
+        // 紀錄錯誤
+        if (!wrongQuestions.find(item => item.q === currentQ.q)) {
+            wrongQuestions.push(currentQ);
+            localStorage.setItem('wrongQuestions', JSON.stringify(wrongQuestions));
+            displayWrong();
         }
     }
 }
 
-// 渲染錯題本
-function renderWrongList() {
-    const list = document.getElementById('wrong-list');
-    if(!list) return; // 防呆機制
-    
-    if(wrongQuestions.length === 0) {
-        list.innerHTML = "<p style='color:gray;'>目前沒有錯誤紀錄，繼續保持！</p>";
-        return;
-    }
-
-    list.innerHTML = wrongQuestions.map(item => `
-        <div class="wrong-item" style="border-bottom: 1px solid #ddd; padding: 10px 0;">
-            <strong style="color: #d9534f;">🚩 ${item.q}</strong><br>
-            <span style="color: #5bc0de; font-size: 0.9em;">正確答案：${item.a[item.ans]}</span>
-        </div>
-    `).join('');
+function displayWrong() {
+    const wrongList = document.getElementById("wrong-list");
+    wrongList.innerHTML = wrongQuestions.map(q => `<p>${q.q} (答案：${q.a[q.ans]})</p>`).join("");
 }
 
-// 清空錯題本
 function clearWrong() {
-    if(confirm("確定要清空所有的錯誤記錄嗎？清空後將無法復原。")) {
-        localStorage.removeItem('wrongList');
-        wrongQuestions = [];
-        renderWrongList();
-    }
+    wrongQuestions = [];
+    localStorage.removeItem('wrongQuestions');
+    displayWrong();
 }
 
-// 網頁載入時自動啟動測驗
-window.onload = initQuiz;
-    
-
-
-
-
+// 頁面載入後啟動
+window.onload = () => {
+    loadQuestion();
+    displayWrong();
+};
